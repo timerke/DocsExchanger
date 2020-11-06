@@ -1,0 +1,70 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+html, body, .wrapper {
+    height: 100%;
+}
+
+.content {
+    box-sizing: border-box;
+    min-height: 100%;
+    padding-bottom: 90px;
+    text-align: center;
+}
+
+.footer {
+    height: 80px;
+    margin-top: -80px;
+}
+
+/*Стиль для формы авторизации на сайт*/
+.form-signin {
+    width: 100%;
+    max-width: 400px;
+    padding: 15px;
+    margin: auto;
+}
+
+.user {
+    width: 100%;
+    max-width: 500px;
+    margin: auto;
+}
+
+.upload {
+    width: 100%;
+    max-width: 800px;
+    margin: 10px auto;
+}
+
+/*Стиль для таблицы с документами*/
+.table {
+    background: #ffffff;
+    border-collapse: collapse;
+    text-align: left;
+}
+.table th {
+    background: #343a40;
+    color: white;
+    font-weight: normal;
+    padding: 10px 15px;
+    position: relative;
+}
+.table tr:nth-child(odd) {
+    background: #f8f9fa;
+}
+.table td {
+    border: 1px solid #e3eef7;
+    padding: 10px 15px;
+    position: relative;
+    transition: all 0.5s ease;
+}
+
+/**/
+.info {
+    text-align: justify;
+    margin: 20px auto;
+    width: 80%;
+}

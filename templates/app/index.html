@@ -1,0 +1,86 @@
+{% extends 'app/base.html' %}
+
+{% block title %}DocsExchanger{% endblock %}
+
+{% block nav_menu %}
+<ul class="navbar-nav mr-auto">
+    <li class="nav-item">
+        <a class="nav-link active" href="{% url 'home' %}">Главная страница</span></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'private_start' %}">Личный кабинет</span></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'about' %}">Информация</a>
+    </li>
+</ul>
+{% endblock %}
+
+{% block content %}
+
+<!-- Список доступных для всех документов -->
+{% if docs %}
+<h1>Документы</h1>
+<table class="table">
+    <tr>
+        <th>Имя</th>
+        <th>Описание</th>
+        <th>Дата</th>
+        <th>Размер</th>
+        <th>Рейтинг</th>
+        <th>Оценить</th>
+        <th>Скачать</th>
+    </tr>
+    {% for doc in docs %}
+    <tr id="{{doc.file_id}}">
+        <td>{{doc.name}}</td>
+        <td>{{doc.description}}</td>
+        <td>{{doc.date}}</td>
+        <td>{{doc.size}}</td>
+        <td>{{doc.rating}}</td>
+        <td>
+            <form>
+                {% csrf_token %}
+                <button type="submit" class="btn-sm btn-success" onclick="estimate(event)">+</button>
+                <button type="submit" class="btn-sm btn-danger" onclick="estimate(event)">-</button>
+            </form>
+        </td>
+        <td>
+            <a class="btn-sm btn-warning" href='{% url "download_file" %}?file_id={{doc.file_id}}' download>Скачать</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<h1>Нет документов</h1>
+{% endif%}
+
+{% endblock %}
+
+{% block script %}
+<script>
+    /**
+     * Функция увеличивает или уменьшает рейтинг документа на 1.
+     * @param event: событие, вызвавшее функцию.
+     */
+    async function estimate(event) {
+        event.preventDefault();
+        let btn = event.target; // кнопка, по которой кликнули
+        let row = btn.parentNode.parentNode.parentNode; // строка с документом
+        let rating = btn.innerText == '+' ? 1 : -1; // на сколько изменяется рейтинг
+        // Отправляем запрос
+        let url = '{% url "estimate_file" %}?file_id=' + row.id + '&rating=' + String(rating);
+        let response = await fetch(url, { method: 'GET' });
+        // Обрабатываем ответ
+        let json = await response.json();
+        if (response.status == 200) {
+            // Рейтинг документа изменен, меняем рейтинг в таблице
+            let td_rating = row.childNodes[9];
+            td_rating.innerText = json.rating;
+        }
+        else
+            // Произошла ошибка
+            console.log(json.text);
+    }
+</script>
+{% endblock %}

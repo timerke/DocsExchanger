@@ -1,0 +1,302 @@
+{% extends 'app/base.html' %}
+
+{% block title %}Личный кабинет{% endblock %}
+
+{% block nav_menu %}
+<ul class="navbar-nav mr-auto">
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'home' %}">Главная страница</span></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{% url 'private_start' %}">Личный кабинет</span></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'about' %}">Информация</a>
+    </li>
+</ul>
+{% endblock %}
+
+{% block content %}
+
+<!-- Форма с именем пользователя и кнопкой Выйти -->
+<div class="alert alert-secondary user" role="alert">
+    <form>
+        <div class="form-row">
+            <div class="col">
+                <input type="text" readonly class="form-control-plaintext" value="{{username}}">
+            </div>
+            <div class="col">
+                <button type="submit" class="btn-sm btn-secondary" onclick="exit(event)">Выйти</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Форма с загрузкой документа на сервер -->
+<div class="alert alert-success upload" role="alert">
+    <form id="upload_form">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="col">
+                <input type="file" class="form-control-file" id="file" name="file">
+            </div>
+            <div class="col">
+                <button type="submit" class="btn-sm btn-success" onclick="upload(event)">Загрузить</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Список загруженных пользователем документов -->
+{% if docs %}
+<h1>Документы</h1>
+<table class="table">
+    <tr>
+        <th>Имя</th>
+        <th>Описание</th>
+        <th>Дата</th>
+        <th>Размер</th>
+        <th>Рейтинг</th>
+        <th>Доступен</th>
+        <th>Удалить/Сохранить</th>
+    </tr>
+    {% for doc in docs %}
+    <tr id="{{doc.file_id}}">
+        <td>{{doc.name}}</td>
+        <td><input type="text" class="form-control" value="{{doc.description}}"></td>
+        <td>{{doc.date}}</td>
+        <td>{{doc.size}}</td>
+        <td>{{doc.rating}}</td>
+        <td><select class="form-control form-control-sm">
+                {% if doc.access %}
+                <option selected value="Да">Да</option>
+                <option value="Нет">Нет</option>
+                {% else %}
+                <option value="Да">Да</option>
+                <option selected value="Нет">Нет</option>
+                {% endif %}
+            </select></td>
+        <td>
+            <form>
+                {% csrf_token %}
+                <button type="submit" class="btn-sm btn-danger" onclick="delete_file(event)">Удалить</button>
+                <button type="submit" class="btn-sm btn-warning" onclick="save_file(event)">Сохранить</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<h1>Нет документов</h1>
+{% endif%}
+
+{% endblock %}
+
+{% block script %}
+<script>
+    /**
+     * Функция удаляет файл. Вызывается при клике по кнопке Удалить.
+     * @param event: событие, вызвавшее функцию.
+     */
+    async function delete_file(event) {
+        event.preventDefault();
+        let btn = event.target; // кнопка, по которой кликнули
+        let form_data = new FormData(btn.parentNode); // форма с кнопками
+        let row = btn.parentNode.parentNode.parentNode; // строка с документом
+        // Добавляем имя, код доступа и Id документа для удаления
+        form_data.append('username', username);
+        form_data.append('token', token);
+        form_data.append('file_id', row.id);
+        // Отправляем запрос на удаление
+        let response = await fetch('{% url "delete_file" %}', {
+            method: 'POST',
+            body: form_data
+        });
+        // Обрабатываем ответ
+        let json = await response.json();
+        if (response.status == 200) {
+            // Файл удален, удаляем строку с информацией о документе
+            row.remove();
+            let rows = document.getElementsByTagName('tr'); // строки в таблице
+            if (rows.length == 1)
+            {
+                // Если в таблице всего одна строка с заголовком, удаляем таблицу
+                let h1 = document.getElementsByTagName('h1')[0];
+                h1.innerText = 'Нет документов';
+                let table = document.getElementsByTagName('table')[0];
+                table.remove();
+            }
+        }
+        else
+            // Произошла ошибка
+            console.log(json.text);
+    }
+
+    /**
+     * Функция для выхода из личного кабинета.
+     * @param event: событие, вызвавшее функцию.
+     */
+    async function exit(event) {
+        event.preventDefault();
+        // Отправляем запрос на выход
+        let url = '{% url "exit" %}?username=' + username + '&token=' + token;
+        let response = await fetch(url, { method: 'GET' });
+        // Удаляем куки с именем авторизовавшегося пользователя и кодом доступа
+        let expire = new Date();
+        username = '';
+        token = '';
+        document.cookie = 'username=' + username + ';expires=' + expire.toUTCString() + ';';
+        document.cookie = 'token=' + token + ';expires=' + expire.toUTCString() + ';';
+        // Обрабатываем ответ
+        let json = await response.json();
+        if (response.status == 200)
+            // Выход из личного кабинета выполнен, переходим на главную страницу
+            window.location.replace("{% url 'home' %}");
+        else
+            console.log(json.text);
+    }
+
+    /**
+     * Функция сохраняет изменения в описании документа. Вызывается при клике по
+     * кнопке Сохранить.
+     * @param event: событие, вызвавшее функцию.
+     */
+    async function save_file(event) {
+        event.preventDefault();
+        let btn = event.target; // кнопка, по которой кликнули
+        let form_data = new FormData(btn.parentNode); // форма с кнопками
+        let row = btn.parentNode.parentNode.parentNode; // строка с документом
+        let description = row.getElementsByTagName('input')[0].value; // описание документа
+        let access = row.getElementsByTagName('select')[0].value; // доступ к документу
+        access = access == 'Да' ? true : false;
+        // Добавляем имя, код доступа, Id, описание и доступ к документу
+        form_data.append('username', username);
+        form_data.append('token', token);
+        form_data.append('file_id', row.id);
+        form_data.append('description', description);
+        form_data.append('access', access);
+        // Отправляем запрос
+        let response = await fetch('{% url "save_file" %}', {
+            method: 'POST',
+            body: form_data
+        });
+        // Обрабатываем ответ
+        let json = await response.json();
+        if (response.status != 200) {
+            // Изменения не сохранены
+            console.log(json.text);
+        }
+    }
+
+    /**
+     * Функция загружает файл на сервер.
+     * @param event: событие, вызвашее функцию.
+     */
+    async function upload(event) {
+        event.preventDefault();
+        let btn = event.target; // кнопка, по которой кликнули
+        let form = document.getElementById('upload_form');
+        let form_data = new FormData(form);
+        // Добавляем поля с именем пользователя и кодом доступа
+        form_data.append('username', username);
+        form_data.append('token', token);
+        if (form_data.get('file').size == 0)
+            // Не выбран файл для загрузки на сервер
+            return;
+        // Отправляем запрос
+        let response = await fetch('{% url "upload_file" %}', {
+            method: 'POST',
+            body: form_data
+        });
+        // Обрабатываем ответ
+        let json = await response.json();
+        if (response.status == 200) {
+            // Файл успешно загружен. Создаем ячейки строки
+            // Ячейка с именем документа
+            let td_name = document.createElement('td');
+            td_name.innerText = json.name;
+            // Ячейка с описанием
+            let td_description = document.createElement('td');
+            console.log(json.description);
+            td_description.innerHTML = '<input type="text" class="form-control" value="' + json.description + '">';
+            // Ячейка с датой
+            let td_date = document.createElement('td');
+            td_date.innerText = json.date;
+            // Ячейка с размером
+            let td_size = document.createElement('td');
+            td_size.innerText = json.size;
+            // Ячейка с рейтингом
+            let td_rating = document.createElement('td');
+            td_rating.innerText = json.rating;
+            // Ячейка с доступом
+            let td_access = document.createElement('td');
+            if (json.access)
+                td_access.innerHTML = '<select class="form-control form-control-sm">\
+                <option selected value="Да">Да</option>\
+                <option value="Нет">Нет</option>\
+                </select>';
+            else
+                td_access.innerHTML = '<select class="form-control form-control-sm">\
+                <option value="Да">Да</option>\
+                <option selected value="Нет">Нет</option>\
+                </select>';
+            // Ячейка с кнопками сохранить и удалить
+            let td_btns = document.createElement('td');
+            td_btns.innerHTML = '<form>\
+            {% csrf_token %}\
+            <button type="submit" class="btn-sm btn-danger" onclick="delete_file(event)">Удалить</button>\
+            <button type="submit" class="btn-sm btn-warning" onclick="save_file(event)">Сохранить</button>\
+            </form>';
+            // Создаем строку с данными загруженного документа
+            let row = document.createElement('tr');
+            row.id = json.file_id;
+            row.appendChild(td_name);
+            row.appendChild(td_description);
+            row.appendChild(td_date);
+            row.appendChild(td_size);
+            row.appendChild(td_rating);
+            row.appendChild(td_access);
+            row.appendChild(td_btns);
+            // Добавляем строку к таблице
+            let tbody = document.getElementsByTagName('tbody')[0];
+            if (!tbody) {
+                // Если нет таблицы, так как нет ни одного документа, создаем таблицу
+                let table = document.createElement('table');
+                table.classList.add('table');
+                tbody = document.createElement('tbody');
+                tbody.innerHTML = '<tr>\
+                <th>Имя</th>\
+                <th>Описание</th>\
+                <th>Дата</th>\
+                <th>Размер</th>\
+                <th>Рейтинг</th>\
+                <th>Доступен</th>\
+                <th>Удалить/Сохранить</th>\
+                </tr>';
+                table.appendChild(tbody);
+                // Меняем заголовок и добавляем таблицу
+                let h1 = document.getElementsByTagName('h1')[0];
+                h1.innerText = 'Документы';
+                let content = h1.parentNode;
+                content.appendChild(table);
+            }
+            tbody.appendChild(row);
+        }
+        else
+            // Произошла ошибка
+            console.log(json.text);
+    }
+
+    // Получаем имя и код доступа авторизованного пользователя
+    var cookies = document.cookie.split(";");
+    var username, token;
+    // В куках ищем имя пользователя и токен
+    for (let i = 0; i < cookies.length; i++) {
+        let parts = cookies[i].split("=");
+        if (parts[0].trim() == 'username')
+            username = parts[1].trim();
+        else if (parts[0].trim() == 'token')
+            token = parts[1].trim();
+    }
+</script>
+{% endblock %}

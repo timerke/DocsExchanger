@@ -1,0 +1,65 @@
+{% extends 'app/base.html' %}
+
+{% block title %}Личный кабинет{% endblock %}
+
+{% block nav_menu %}
+<ul class="navbar-nav mr-auto">
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'home' %}">Главная страница</span></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{% url 'private_start' %}">Личный кабинет</span></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'about' %}">Информация</a>
+    </li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<!-- Форма с авторизацией в личный кабинет -->
+<form class="form-signin">
+    {% csrf_token %}
+    <h1 class="h3 mb-3 font-weight-normal">Пожалуйста, авторизуйтесь</h1>
+    <label for="username" class="sr-only">Логин</label>
+    <input type="text" id="username" class="form-control" placeholder="Логин" required="" autofocus="" name="username">
+    <label for="password" class="sr-only">Пароль</label>
+    <input type="password" id="password" class="form-control" placeholder="Пароль" required="" name="password">
+    <button type="submit" class="btn btn-lg btn-primary btn-block" onclick="sign_in(event)">Войти</button>
+    <button type="submit" class="btn btn-lg btn-primary btn-block" onclick="sign_in(event)">Зарегистрироваться</button>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+    /**
+     * Функция отправляет имя и пароль пользователя для авторизации.
+     * @param event: событие, вызвавшее функцию.
+     */
+    async function sign_in(event) {
+        event.preventDefault();
+        let btn = event.target; // кнопка, по которой кликнули
+        let form_data = new FormData(btn.parentNode); // форма для авторизации
+        if (btn.innerText == 'Войти')
+            form_data.append('sign_in', 1); // пользователь входит в ЛК
+        else
+            form_data.append('sign_in', 0); // пользователь регистрируется
+        let response = await fetch('{% url "sign_in" %}', {
+            method: 'POST',
+            body: form_data
+        });
+        let json = await response.json();
+        if (response.status == 200) {
+            // Вход в личный кабинет выполнен
+            let expire = new Date();
+            expire.setHours(expire.getHours() + 4);
+            document.cookie = "username=" + json.username + ";expires=" + expire.toUTCString() + ";";
+            document.cookie = "token=" + json.token + ";expires=" + expire.toUTCString() + ";";
+            // Пользователь авторизовался. Отправляем в личный кабинет
+            window.location.replace("{% url 'private' %}?username=" + json.username + '&token=' + json.token);
+        }
+        else
+            console.log(json.text);
+    }
+</script>
+{% endblock %}

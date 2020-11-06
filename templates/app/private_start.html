@@ -1,0 +1,39 @@
+{% extends 'app/base.html' %}
+
+{% block title %}Личный кабинет{% endblock %}
+
+{% block nav_menu %}
+<ul class="navbar-nav mr-auto">
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'home' %}">Главная страница</span></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{% url 'private_start' %}">Личный кабинет</span></a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'about' %}">Информация</a>
+    </li>
+</ul>
+{% endblock %}
+
+{% block script %}
+<script>
+    // Проверяем, авторизовался ли пользователь
+    var cookies = document.cookie.split(";");
+    var username, token;
+    // В куках ищем имя пользователя и токен
+    for (let i = 0; i < cookies.length; i++) {
+        let parts = cookies[i].split("=");
+        if (parts[0].trim() == 'username')
+            username = parts[1].trim();
+        else if (parts[0].trim() == 'token')
+            token = parts[1].trim();
+    }
+    if (username && token)
+        // Пользователь авторизовался. Отправляем в личный кабинет
+        window.location.replace("{% url 'private' %}?username=" + username + '&token=' + token);
+    else
+        // Пользователь не авторизовался. Отправляем на страницу авторизации
+        window.location.replace("{% url 'sign_in' %}");
+</script>
+{% endblock %}
