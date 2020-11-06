@@ -32,8 +32,10 @@ def delete_file(request):
         # Пользователь найден, код доступа верен. Получаем документ по Id
         doc = user.docs_set.filter(id=file_id)
         if doc:
-            # Файл найден. Удаляем его
-            print(dir(doc))
+            # Файл найден. Удаляем его из файловой системы и базы данных
+            filepath = doc.last().filepath
+            os.remove(filepath)
+            os.rmdir(os.path.dirname(filepath))
             doc.delete()
             return JsonResponse({}, status=200)
         # Файла нет
@@ -144,6 +146,34 @@ def private_start(request):
     return render(request, 'app/private_start.html')
 
 
+def register(request):
+    """Функция представления показывает страницу регистрации нового
+    пользователя и обрабатывает запрос на регистрацию."""
+
+    if request.method == 'GET':
+        return render(request, 'app/register.html')
+    if request.method == 'POST':
+        # Получаем имя и пароль
+        name = request.POST.get('username')
+        password = request.POST.get('password1')
+        password_repeat = request.POST.get('password2')
+        if not name or not password or password != password_repeat:
+            return JsonResponse(
+                {'text': 'Не указано имя или один из паролей'}, status=400)
+        # Все поля корректно заполнены
+        try:
+            user = Users.objects.get(name=name)
+        except Users.DoesNotExist:
+            # Пользователь не зарегистрирован, регистрируем его
+            user = Users.objects.create(name=name, password=password)
+            user.save()
+            return JsonResponse({'username': name}, status=200)
+        # Пользователь уже зарегистрирован
+        return JsonResponse(
+            {'text': 'Пользователь с указанным именем уже зарегистрирован'}, status=400)
+    return JsonResponse({'text': 'Неизвестный запрос'}, status=400)
+
+
 def save_file(request):
     """Функция представления сохраняет изменения в описании и доступе к
     документу."""
@@ -179,48 +209,30 @@ def sign_in(request):
     if request.method == 'GET':
         return render(request, 'app/sign_in.html')
     if request.method == 'POST':
-        # Получаем имя, пароль и параметр, отвечающий за вход или регистрацию
+        # Получаем имя и пароль пользователя
         name = request.POST.get('username')
         password = request.POST.get('password')
-        is_sign_in = int(request.POST.get('sign_in'))
         if not name or not password:
             return JsonResponse({'text': 'Не указано имя или пароль'},
                                 status=400)
-        if is_sign_in:
-            # Пользователь уже зарегистрирован, хочет войти в личный кабинет
-            try:
-                user = Users.objects.get(name=name)
-            except Users.DoesNotExist:
-                # Пользователь не зарегистрирован
-                return JsonResponse({'text': 'Пользователь не зарегистрирован'},
-                                    status=404)
-            # Пользователь зарегистрирован
-            if password == user.password:
-                # Введен верный пароль. Генерируем случайный код доступа и
-                # сохраняем
-                uuid4 = uuid.uuid4()
-                user.token = uuid4
-                user.save()
-                return JsonResponse({'username': name, 'token': uuid4},
-                                    status=200)
-            # Пароль неверный
-            return JsonResponse({'text': 'Неверный пароль'}, status=401)
-        else:
-            # Пользователь регистрируется
-            try:
-                user = Users.objects.get(name=name)
-            except Users.DoesNotExist:
-                # Пользователь не зарегистрирован, регистрируем его, генерируем
-                # случайный код доступа и сохраняем
-                uuid4 = uuid.uuid4()
-                user = Users.objects.create(name=name, password=password,
-                                            token=uuid4)
-                user.save()
-                return JsonResponse({'username': name, 'token': uuid4},
-                                    status=200)
-            # Пользователь уже зарегистрирован
-            return JsonResponse(
-                {'text': 'Пользователь с указанным именем уже зарегистрирован'}, status=400)
+        # Имя и пароль указаны
+        try:
+            user = Users.objects.get(name=name)
+        except Users.DoesNotExist:
+            # Пользователь не зарегистрирован
+            return JsonResponse({'text': 'Пользователь не зарегистрирован'},
+                                status=404)
+        # Пользователь зарегистрирован
+        if password == user.password:
+            # Введен верный пароль. Генерируем случайный код доступа и
+            # сохраняем
+            uuid4 = uuid.uuid4()
+            user.token = uuid4
+            user.save()
+            return JsonResponse({'username': name, 'token': uuid4},
+                                status=200)
+        # Пароль неверный
+        return JsonResponse({'text': 'Неверный пароль'}, status=401)
 
 
 def upload_file(request):
@@ -242,14 +254,19 @@ def upload_file(request):
         except Users.DoesNotExist:
             return JsonResponse({'text': 'Неверное имя или код доступа'},
                                 status=400)
+        # Добавляем запись в базу данных
+        doc = Docs(description=description, size=file.size)
+        user.docs_set.add(doc, bulk=False)
         # Сохраняем файл на сервер
-        filepath = f'db/{file.name}'  # путь, где сохранится файл на сервере
+        os.mkdir(f'db/{doc.id}')
+        filepath = f'db/{doc.id}/{file.name}'
         with open(filepath, 'wb') as f:
             f.write(file.read())
-        # Добавляем запись в базу данных
-        doc = Docs(description=description, filepath=filepath, size=file.size)
+        # Записываем путь к файлу в базу данных
+        doc.filepath = filepath
+        doc.save()
+        # Получаем данные о файле и отправляем
         description = description if description else ''
-        user.docs_set.add(doc, bulk=False)
         doc_info =\
             {'file_id': doc.id, 'name': os.path.basename(doc.filepath),
              'description': description,

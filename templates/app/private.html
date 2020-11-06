@@ -47,9 +47,12 @@
     </form>
 </div>
 
+<!-- Блок для вывода сообщений -->
+<div id="msg_block"></div>
+
 <!-- Список загруженных пользователем документов -->
 {% if docs %}
-<h1>Документы</h1>
+<h2>Документы</h2>
 <table class="table">
     <tr>
         <th>Имя</th>
@@ -87,13 +90,28 @@
     {% endfor %}
 </table>
 {% else %}
-<h1>Нет документов</h1>
+<h2>Нет документов</h2>
 {% endif%}
 
 {% endblock %}
 
 {% block script %}
 <script>
+    /**
+     * Функция выводит сообщения.
+     * @param msg: сообщение, которое нужно вывести;
+     * @param bad: если true, то сообщение об ошибке.
+     */
+    function show_msg(msg, bad = true) {
+        if (bad)
+            msg_block.className = 'alert alert-danger';
+        else if (msg)
+            msg_block.className = 'alert alert-success';
+        else
+            msg_block.className = ''
+        msg_block.innerText = msg;
+    }
+
     /**
      * Функция удаляет файл. Вызывается при клике по кнопке Удалить.
      * @param event: событие, вызвавшее функцию.
@@ -118,18 +136,21 @@
             // Файл удален, удаляем строку с информацией о документе
             row.remove();
             let rows = document.getElementsByTagName('tr'); // строки в таблице
-            if (rows.length == 1)
-            {
+            if (rows.length == 1) {
                 // Если в таблице всего одна строка с заголовком, удаляем таблицу
-                let h1 = document.getElementsByTagName('h1')[0];
-                h1.innerText = 'Нет документов';
+                let h2 = document.getElementsByTagName('h2')[0];
+                h2.innerText = 'Нет документов';
                 let table = document.getElementsByTagName('table')[0];
                 table.remove();
             }
+            // Блок с сообщением
+            show_msg('', false);
         }
-        else
-            // Произошла ошибка
+        else {
+            // Произошла ошибка, выводим сообщение
             console.log(json.text);
+            show_msg(json.text);
+        }
     }
 
     /**
@@ -152,8 +173,11 @@
         if (response.status == 200)
             // Выход из личного кабинета выполнен, переходим на главную страницу
             window.location.replace("{% url 'home' %}");
-        else
+        else {
+            // Произошла ошибка, выводим сообщение
             console.log(json.text);
+            show_msg(json.text);
+        }
     }
 
     /**
@@ -182,9 +206,12 @@
         });
         // Обрабатываем ответ
         let json = await response.json();
-        if (response.status != 200) {
-            // Изменения не сохранены
+        if (response.status == 200)
+            show_msg('', false);
+        else {
+            // Произошла ошибка, выводим сообщение
             console.log(json.text);
+            show_msg(json.text);
         }
     }
 
@@ -200,9 +227,11 @@
         // Добавляем поля с именем пользователя и кодом доступа
         form_data.append('username', username);
         form_data.append('token', token);
-        if (form_data.get('file').size == 0)
+        if (form_data.get('file').size == 0) {
             // Не выбран файл для загрузки на сервер
+            show_msg('Не выбран файл для загрузки');
             return;
+        }
         // Отправляем запрос
         let response = await fetch('{% url "upload_file" %}', {
             method: 'POST',
@@ -275,16 +304,19 @@
                 </tr>';
                 table.appendChild(tbody);
                 // Меняем заголовок и добавляем таблицу
-                let h1 = document.getElementsByTagName('h1')[0];
-                h1.innerText = 'Документы';
-                let content = h1.parentNode;
+                let h2 = document.getElementsByTagName('h2')[0];
+                h2.innerText = 'Документы';
+                let content = h2.parentNode;
                 content.appendChild(table);
             }
             tbody.appendChild(row);
+            show_msg('', false);
         }
-        else
-            // Произошла ошибка
+        else {
+            // Произошла ошибка, выводим сообщение
             console.log(json.text);
+            show_msg(json.text);
+        }
     }
 
     // Получаем имя и код доступа авторизованного пользователя
@@ -298,5 +330,7 @@
         else if (parts[0].trim() == 'token')
             token = parts[1].trim();
     }
+    // Получаем блок для вывода сообщений
+    var msg_block = document.getElementById('msg_block');
 </script>
 {% endblock %}

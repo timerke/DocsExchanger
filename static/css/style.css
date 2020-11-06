@@ -68,3 +68,9 @@ html, body, .wrapper {
     margin: 20px auto;
     width: 80%;
 }
+
+/*Стиль блока с выводом сообщений об ошибках работы сайта*/
+#msg_block {
+    margin: 20px auto;
+    width: 80%;
+}

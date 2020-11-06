@@ -18,9 +18,12 @@
 
 {% block content %}
 
+<!-- Блок для вывода сообщений -->
+<div id="msg_block"></div>
+
 <!-- Список доступных для всех документов -->
 {% if docs %}
-<h1>Документы</h1>
+<h2>Документы</h2>
 <table class="table">
     <tr>
         <th>Имя</th>
@@ -52,13 +55,27 @@
     {% endfor %}
 </table>
 {% else %}
-<h1>Нет документов</h1>
+<h2>Нет документов</h2>
 {% endif%}
 
 {% endblock %}
 
 {% block script %}
 <script>
+    /**
+     * Функция выводит сообщения.
+     * @param msg: сообщение, которое нужно вывести;
+     * @param bad: если true, то сообщение об ошибке.
+     */
+    function show_msg(msg, bad = true) {
+        if (bad)
+            msg_block.className = 'alert alert-danger';
+        else if (msg)
+            msg_block.className = 'alert alert-success';
+        else
+            msg_block.className = ''
+        msg_block.innerText = msg;
+    }
     /**
      * Функция увеличивает или уменьшает рейтинг документа на 1.
      * @param event: событие, вызвавшее функцию.
@@ -77,10 +94,16 @@
             // Рейтинг документа изменен, меняем рейтинг в таблице
             let td_rating = row.childNodes[9];
             td_rating.innerText = json.rating;
+            show_msg('', false);
         }
-        else
-            // Произошла ошибка
+        else {
+            // Произошла ошибка. Выводим сообщение об ошибке
             console.log(json.text);
+            show_msg(json.text);
+        }
     }
+
+    // Получаем блок для вывода сообщений
+    var msg_block = document.getElementById('msg_block');
 </script>
 {% endblock %}
